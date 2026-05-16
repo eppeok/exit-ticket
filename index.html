@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Exit Ticket — Quick Class Check-In</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#06090f;--card:#0c1220;--border:#1a2840;
+  --text:#e2e8f0;--dim:#64748b;--sub:#94a3b8;
+  --blue:#3b82f6;--green:#22c55e;--yellow:#f59e0b;--red:#ef4444;--pink:#ec4899;--purple:#a78bfa;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+#stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.star{position:absolute;border-radius:50%;background:#fff;animation:twinkle var(--d,3s) var(--delay,0s) infinite alternate}
+@keyframes twinkle{from{opacity:.1}to{opacity:.6}}
+
+nav{position:sticky;top:0;z-index:100;background:#06090fee;backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;gap:10px;height:56px}
+.nav-back{font-size:.8rem;font-weight:700;color:var(--dim);text-decoration:none;padding:5px 12px;border:1px solid var(--border);border-radius:20px;transition:color .2s}
+.nav-back:hover{color:var(--text)}
+.nav-title{font-size:1.1rem;font-weight:900;background:linear-gradient(90deg,var(--pink),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:auto}
+
+.screen{display:none;position:relative;z-index:1;max-width:640px;margin:0 auto;padding:40px 20px}
+.screen.active{display:block}
+
+/* ROLE PICKER */
+.role-pick h1{font-size:2rem;font-weight:900;margin-bottom:8px}
+.role-pick p{color:var(--sub);margin-bottom:32px}
+.role-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.role-card{background:var(--card);border:2px solid var(--border);border-radius:20px;padding:30px 20px;text-align:center;cursor:pointer;transition:all .25s}
+.role-card:hover{transform:translateY(-4px)}
+.role-card.teacher:hover{border-color:var(--pink)}
+.role-card.student:hover{border-color:var(--purple)}
+.role-icon{font-size:3rem;margin-bottom:12px}
+.role-name{font-size:1.1rem;font-weight:800;margin-bottom:6px}
+.role-desc{font-size:.82rem;color:var(--dim)}
+
+/* TEACHER CREATE */
+.section-label{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--pink);margin-bottom:10px}
+textarea,input[type=text]{background:#111827;border:1px solid var(--border);color:#fff;border-radius:10px;padding:10px 14px;font-size:.95rem;width:100%;outline:none;transition:border-color .2s;font-family:inherit}
+textarea{resize:vertical;min-height:90px}
+input:focus,textarea:focus{border-color:var(--blue)}
+.type-row{display:flex;gap:8px;margin-bottom:20px}
+.type-btn{flex:1;padding:10px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--sub);font-size:.85rem;font-weight:700;cursor:pointer;transition:all .2s}
+.type-btn.active{border-color:var(--pink);background:#2a0a18;color:var(--pink)}
+.big-btn{width:100%;padding:14px;border-radius:14px;border:none;font-size:1rem;font-weight:800;cursor:pointer;transition:all .2s;margin-top:6px}
+.big-btn:hover{transform:translateY(-2px);filter:brightness(1.1)}
+.big-btn.pink{background:linear-gradient(135deg,var(--pink),var(--purple));color:#fff}
+.big-btn.blue{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff}
+.big-btn.ghost{background:var(--card);border:1px solid var(--border);color:var(--text)}
+
+/* LIVE CODE DISPLAY */
+.code-display{background:var(--card);border:2px solid var(--pink);border-radius:20px;padding:28px;text-align:center;margin-bottom:24px}
+.code-label{font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--dim);margin-bottom:10px}
+.code-num{font-size:4rem;font-weight:900;letter-spacing:10px;color:var(--pink);font-variant-numeric:tabular-nums}
+.code-hint{font-size:.82rem;color:var(--sub);margin-top:8px}
+
+/* TEACHER LIVE VIEW */
+.question-display{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:20px}
+.question-text{font-size:1.1rem;font-weight:700;margin-bottom:4px}
+.response-count{font-size:.85rem;color:var(--dim)}
+
+/* Rating bar chart */
+.rating-bars{display:flex;align-items:flex-end;gap:8px;height:80px;margin:16px 0}
+.rating-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.rating-bar{width:100%;background:var(--border);border-radius:6px 6px 0 0;transition:height .3s;min-height:4px}
+.rating-bar-label{font-size:.75rem;font-weight:700;color:var(--dim)}
+.rating-bar-count{font-size:.7rem;color:var(--sub)}
+.r1{background:#ef4444}.r2{background:#f97316}.r3{background:#f59e0b}.r4{background:#84cc16}.r5{background:#22c55e}
+
+.response-list{max-height:300px;overflow-y:auto}
+.response-item{background:#0a0e18;border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
+.resp-name{font-size:.78rem;font-weight:700;color:var(--pink);white-space:nowrap}
+.resp-text{font-size:.88rem;flex:1}
+.resp-rating{font-size:1.2rem}
+.no-responses{color:var(--dim);font-size:.9rem;text-align:center;padding:20px 0}
+
+/* STUDENT SCREENS */
+.join-row{display:flex;gap:10px;margin-bottom:16px}
+.code-input{flex:1;text-align:center;font-size:1.8rem;font-weight:900;letter-spacing:8px;background:#111827;border:2px solid var(--border);color:#fff;border-radius:12px;padding:12px;outline:none;transition:border-color .2s}
+.code-input:focus{border-color:var(--purple)}
+
+.question-card{background:var(--card);border:2px solid var(--border);border-radius:20px;padding:28px;text-align:center;margin-bottom:24px}
+.q-emoji{font-size:2.5rem;margin-bottom:12px}
+.q-text{font-size:1.2rem;font-weight:700;line-height:1.5}
+
+/* Rating picker */
+.rating-row{display:flex;gap:10px;justify-content:center;margin:16px 0 24px}
+.rating-btn{width:56px;height:56px;border-radius:50%;border:2px solid var(--border);background:var(--card);font-size:1.4rem;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.rating-btn:hover,.rating-btn.selected{transform:scale(1.2);border-color:var(--yellow)}
+.rating-labels{display:flex;justify-content:space-between;font-size:.7rem;color:var(--dim);margin-bottom:20px;padding:0 4px}
+
+.success-screen{text-align:center;padding:40px 20px}
+.success-icon{font-size:5rem;animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.success-screen h2{font-size:1.8rem;font-weight:900;margin:16px 0 8px}
+.success-screen p{color:var(--sub)}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid var(--border);border-radius:50px;padding:10px 24px;font-size:.9rem;font-weight:600;z-index:999;transition:opacity .3s;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="stars"></div>
+<nav>
+  <a href="https://eppeok.github.io" class="nav-back">← All Tools</a>
+  <div class="nav-title">🎯 Exit Ticket</div>
+</nav>
+
+<!-- ROLE PICKER -->
+<div id="screen-role" class="screen active">
+<div class="role-pick">
+  <h1>🎯 Exit Ticket</h1>
+  <p>60-second class check-in. See who got it and who didn't — instantly.</p>
+  <div class="role-cards">
+    <div class="role-card teacher" onclick="showScreen('teacher-create')">
+      <div class="role-icon">👩‍🏫</div>
+      <div class="role-name">I'm a Teacher</div>
+      <div class="role-desc">Create a ticket and watch responses live</div>
+    </div>
+    <div class="role-card student" onclick="showScreen('student-join')">
+      <div class="role-icon">🧑‍🎓</div>
+      <div class="role-name">I'm a Student</div>
+      <div class="role-desc">Enter the code on the board to respond</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- TEACHER: CREATE -->
+<div id="screen-teacher-create" class="screen">
+  <div class="section-label">Your Question</div>
+  <textarea id="teacher-question" placeholder="e.g. What is the difference between a simile and a metaphor?" style="margin-bottom:20px"></textarea>
+
+  <div class="section-label">Response Type</div>
+  <div class="type-row">
+    <button class="type-btn active" id="type-rating" onclick="selectType('rating')">⭐ Understanding Rating</button>
+    <button class="type-btn" id="type-text" onclick="selectType('text')">✏️ Short Answer</button>
+    <button class="type-btn" id="type-both" onclick="selectType('both')">⭐ + ✏️ Both</button>
+  </div>
+
+  <div class="section-label" style="margin-top:8px">Your Name (optional)</div>
+  <input type="text" id="teacher-name" placeholder="Ms Smith..." style="margin-bottom:24px"/>
+
+  <button class="big-btn pink" onclick="createTicket()">Create Ticket 🎯</button>
+  <button class="big-btn ghost" style="margin-top:10px" onclick="showScreen('role')">← Back</button>
+</div>
+
+<!-- TEACHER: LIVE VIEW -->
+<div id="screen-teacher-live" class="screen" style="max-width:760px">
+  <div class="code-display">
+    <div class="code-label">Share this code</div>
+    <div class="code-num" id="live-code">----</div>
+    <div class="code-hint">Students go to <strong>eppeok.github.io/exit-ticket</strong> and enter this code</div>
+  </div>
+
+  <div class="question-display">
+    <div class="question-text" id="live-question-text"></div>
+    <div class="response-count" id="live-resp-count">0 responses</div>
+  </div>
+
+  <!-- Rating bars (shown for rating/both type) -->
+  <div id="rating-chart" style="display:none">
+    <div class="section-label">Understanding Ratings</div>
+    <div class="rating-bars">
+      <div class="rating-bar-wrap"><div class="rating-bar r1" id="bar-1" style="height:4px"></div><div class="rating-bar-label">1</div><div class="rating-bar-count" id="bc-1">0</div></div>
+      <div class="rating-bar-wrap"><div class="rating-bar r2" id="bar-2" style="height:4px"></div><div class="rating-bar-label">2</div><div class="rating-bar-count" id="bc-2">0</div></div>
+      <div class="rating-bar-wrap"><div class="rating-bar r3" id="bar-3" style="height:4px"></div><div class="rating-bar-label">3</div><div class="rating-bar-count" id="bc-3">0</div></div>
+      <div class="rating-bar-wrap"><div class="rating-bar r4" id="bar-4" style="height:4px"></div><div class="rating-bar-label">4</div><div class="rating-bar-count" id="bc-4">0</div></div>
+      <div class="rating-bar-wrap"><div class="rating-bar r5" id="bar-5" style="height:4px"></div><div class="rating-bar-label">5</div><div class="rating-bar-count" id="bc-5">0</div></div>
+    </div>
+  </div>
+
+  <!-- Text responses -->
+  <div id="text-responses-section" style="display:none">
+    <div class="section-label">Responses</div>
+    <div class="response-list" id="response-list"><div class="no-responses">Waiting for students...</div></div>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-top:20px">
+    <button class="big-btn ghost" style="margin-top:0" onclick="closeTicket()">🔒 Close Ticket</button>
+    <button class="big-btn pink" style="margin-top:0" onclick="createTicket()">New Ticket +</button>
+  </div>
+</div>
+
+<!-- STUDENT: JOIN -->
+<div id="screen-student-join" class="screen">
+  <h2 style="font-size:1.5rem;font-weight:900;margin-bottom:8px">Enter the code</h2>
+  <p style="color:var(--sub);margin-bottom:24px">Your teacher has a 4-digit code on the board.</p>
+
+  <input type="text" id="student-name" placeholder="Your name..." style="margin-bottom:12px" maxlength="16"/>
+  <input type="number" id="join-code" class="code-input" placeholder="1234" maxlength="4" style="width:100%;margin-bottom:16px"/>
+  <button class="big-btn blue" onclick="joinTicket()">Join →</button>
+  <button class="big-btn ghost" style="margin-top:10px" onclick="showScreen('role')">← Back</button>
+</div>
+
+<!-- STUDENT: RESPOND -->
+<div id="screen-student-respond" class="screen">
+  <div class="question-card">
+    <div class="q-emoji">❓</div>
+    <div class="q-text" id="student-question-text">Loading...</div>
+  </div>
+
+  <div id="rating-section" style="display:none">
+    <div class="section-label" style="text-align:center;margin-bottom:4px">How well do you understand this?</div>
+    <div class="rating-row" id="rating-buttons">
+      <button class="rating-btn" data-r="1" onclick="selectRating(1)">😕</button>
+      <button class="rating-btn" data-r="2" onclick="selectRating(2)">😐</button>
+      <button class="rating-btn" data-r="3" onclick="selectRating(3)">🙂</button>
+      <button class="rating-btn" data-r="4" onclick="selectRating(4)">😊</button>
+      <button class="rating-btn" data-r="5" onclick="selectRating(5)">🤩</button>
+    </div>
+    <div class="rating-labels"><span>Not at all</span><span>Totally got it!</span></div>
+  </div>
+
+  <div id="text-section" style="display:none;margin-bottom:20px">
+    <div class="section-label">Your Answer</div>
+    <textarea id="student-answer" placeholder="Type your answer here..." style="min-height:80px"></textarea>
+  </div>
+
+  <button class="big-btn pink" id="submit-btn" onclick="submitResponse()">Submit ✓</button>
+</div>
+
+<!-- STUDENT: DONE -->
+<div id="screen-student-done" class="screen">
+  <div class="success-screen">
+    <div class="success-icon">✅</div>
+    <h2>Submitted!</h2>
+    <p>Your teacher can see your response.</p>
+  </div>
+</div>
+
+<div class="toast" id="toast" style="opacity:0"></div>
+
+<script>
+let db;
+try{
+  if(!firebase.apps.length){
+    firebase.initializeApp({
+      apiKey:"AIzaSyAfflbNLrrn95tPvLW0bzR8Q4iAqOKUOrM",
+      authDomain:"sdvb-d16b2.firebaseapp.com",
+      databaseURL:"https://sdvb-d16b2-default-rtdb.firebaseio.com",
+      projectId:"sdvb-d16b2",
+      storageBucket:"sdvb-d16b2.firebasestorage.app",
+      messagingSenderId:"1007920126855",
+      appId:"1:1007920126855:web:4d5fd1d73d311bd694d122"
+    });
+  }
+  db=firebase.database();
+}catch(e){console.warn('Firebase unavailable',e);}
+
+// Stars
+(()=>{const c=document.getElementById('stars');for(let i=0;i<70;i++){const s=document.createElement('div');s.className='star';const sz=Math.random()*2+1;s.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*100}%;--d:${2+Math.random()*4}s;--delay:${Math.random()*4}s;opacity:.3`;c.appendChild(s);}})();
+
+let selectedType='rating';
+let selectedRating=0;
+let liveListener=null;
+let currentCode=null;
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
+}
+
+function selectType(t){
+  selectedType=t;
+  ['rating','text','both'].forEach(x=>document.getElementById('type-'+x).classList.toggle('active',x===t));
+}
+
+function toast(msg,ms=2500){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.style.opacity='1';
+  setTimeout(()=>el.style.opacity='0',ms);
+}
+
+function genCode(){ return String(Math.floor(1000+Math.random()*9000)); }
+
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+async function createTicket(){
+  const q=(document.getElementById('teacher-question').value||'').trim();
+  if(!q){toast('Please enter a question first!');return;}
+  if(!db){toast('No internet connection');return;}
+
+  // Detach any old listener
+  if(liveListener&&currentCode){
+    db.ref('exittickets/'+currentCode+'/responses').off('value',liveListener);
+    liveListener=null;
+  }
+
+  const code=genCode();
+  currentCode=code;
+  const ticket={
+    question:q, type:selectedType,
+    createdAt:firebase.database.ServerValue.TIMESTAMP,
+    active:true
+  };
+
+  try{
+    await db.ref('exittickets/'+code).set(ticket);
+  }catch(e){toast('Could not create ticket — check connection');return;}
+
+  document.getElementById('live-code').textContent=code;
+  document.getElementById('live-question-text').textContent=q;
+  document.getElementById('live-resp-count').textContent='0 responses';
+  document.getElementById('rating-chart').style.display=(selectedType==='rating'||selectedType==='both')?'block':'none';
+  document.getElementById('text-responses-section').style.display=(selectedType==='text'||selectedType==='both')?'block':'none';
+  document.getElementById('response-list').innerHTML='<div class="no-responses">Waiting for students...</div>';
+  [1,2,3,4,5].forEach(i=>{
+    document.getElementById('bar-'+i).style.height='4px';
+    document.getElementById('bc-'+i).textContent='0';
+  });
+
+  // Listen for responses
+  liveListener=db.ref('exittickets/'+code+'/responses').on('value',snap=>{
+    const resps=snap.val()||{};
+    const list=Object.values(resps);
+    document.getElementById('live-resp-count').textContent=list.length+' response'+(list.length!==1?'s':'');
+
+    // Update ratings
+    if(selectedType==='rating'||selectedType==='both'){
+      const counts={1:0,2:0,3:0,4:0,5:0};
+      list.forEach(r=>{ if(r.rating>=1&&r.rating<=5) counts[r.rating]++; });
+      const max=Math.max(...Object.values(counts),1);
+      [1,2,3,4,5].forEach(i=>{
+        document.getElementById('bar-'+i).style.height=Math.max(4,(counts[i]/max)*76)+'px';
+        document.getElementById('bc-'+i).textContent=counts[i];
+      });
+    }
+
+    // Update text responses
+    if(selectedType==='text'||selectedType==='both'){
+      const el=document.getElementById('response-list');
+      if(!list.length){ el.innerHTML='<div class="no-responses">Waiting for students...</div>'; return; }
+      el.innerHTML=list.map(r=>`
+        <div class="response-item">
+          ${r.rating?`<div class="resp-rating">${['','😕','😐','🙂','😊','🤩'][r.rating]||''}</div>`:''}
+          <div>
+            <div class="resp-name">${escHtml(r.name||'Anonymous')}</div>
+            ${r.answer?`<div class="resp-text">${escHtml(r.answer)}</div>`:''}
+          </div>
+        </div>`).join('');
+    }
+  });
+
+  showScreen('teacher-live');
+}
+
+async function closeTicket(){
+  if(!currentCode||!db) return;
+  db.ref('exittickets/'+currentCode+'/responses').off('value',liveListener);
+  liveListener=null;
+  await db.ref('exittickets/'+currentCode+'/active').set(false).catch(()=>{});
+  currentCode=null;
+  showScreen('teacher-create');
+  toast('Ticket closed ✓');
+}
+
+async function joinTicket(){
+  const name=(document.getElementById('student-name').value||'').trim().slice(0,16);
+  const code=(document.getElementById('join-code').value||'').trim();
+  if(!name){toast('Enter your name first');return;}
+  if(code.length!==4){toast('Enter the 4-digit code');return;}
+  if(!db){toast('No internet connection');return;}
+
+  try{
+    const snap=await db.ref('exittickets/'+code).once('value');
+    const ticket=snap.val();
+    if(!ticket){toast('❌ Code not found — check the board');return;}
+    if(ticket.active===false){toast('❌ That ticket is already closed');return;}
+
+    document.getElementById('student-question-text').textContent=ticket.question;
+    const type=ticket.type||'rating';
+    document.getElementById('rating-section').style.display=(type==='rating'||type==='both')?'block':'none';
+    document.getElementById('text-section').style.display=(type==='text'||type==='both')?'block':'none';
+    selectedRating=0;
+
+    // Store for submit
+    window._ticketCode=code;
+    window._ticketType=type;
+    window._studentName=name;
+
+    showScreen('student-respond');
+  }catch(e){toast('Could not join — check connection');console.error(e);}
+}
+
+function selectRating(r){
+  selectedRating=r;
+  document.querySelectorAll('.rating-btn').forEach(b=>{
+    b.classList.toggle('selected',parseInt(b.dataset.r)===r);
+  });
+}
+
+async function submitResponse(){
+  const type=window._ticketType||'rating';
+  if((type==='rating'||type==='both')&&!selectedRating){toast('Please pick a rating');return;}
+  const answer=(document.getElementById('student-answer')?.value||'').trim();
+  if((type==='text'||type==='both')&&!answer){toast('Please type an answer');return;}
+  if(!db){toast('No internet');return;}
+
+  const resp={
+    name:window._studentName||'Anonymous',
+    ts:firebase.database.ServerValue.TIMESTAMP
+  };
+  if(selectedRating) resp.rating=selectedRating;
+  if(answer) resp.answer=answer.slice(0,300);
+
+  try{
+    await db.ref('exittickets/'+window._ticketCode+'/responses').push(resp);
+    showScreen('student-done');
+  }catch(e){toast('Could not submit — check connection');console.error(e);}
+}
+</script>
+</body>
+</html>

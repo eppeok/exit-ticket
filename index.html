@@ -407,11 +407,19 @@ async function submitResponse(){
   if(selectedRating) resp.rating=selectedRating;
   if(answer) resp.answer=answer.slice(0,300);
 
+  // Prevent duplicate submissions
+  const submitKey='exit_submitted_'+window._ticketCode;
+  if(localStorage.getItem(submitKey)){toast('Already submitted!');showScreen('student-done');return;}
   try{
-    await db.ref('exittickets/'+window._ticketCode+'/responses').push(resp);
+    const uid=window._studentName?window._studentName.toLowerCase().replace(/[^a-z0-9]/g,'_')+'_'+Date.now():'anon_'+Date.now();
+    await db.ref('exittickets/'+window._ticketCode+'/responses/'+uid).set(resp);
+    localStorage.setItem(submitKey,'1');
     showScreen('student-done');
   }catch(e){toast('Could not submit — check connection');console.error(e);}
 }
+window.addEventListener('beforeunload',()=>{
+  if(liveListener&&currentCode) db.ref('exittickets/'+currentCode+'/responses').off('value',liveListener);
+});
 </script>
 </body>
 </html>
